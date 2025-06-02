@@ -36,10 +36,14 @@ class JobSearchRequest(BaseModel):
         default=["indeed", "linkedin", "glassdoor"],
         description="Job sites to search: linkedin, indeed, glassdoor, zip_recruiter, google, bayt, naukri",
     )
-    search_term: str = Field(description="Job search term")
+    search_term: Optional[str] = Field(default=None, description="Job search term")
+    google_search_term: Optional[str] = Field(
+        default=None,
+        description="Specific search term for Google Jobs (required for Google)",
+    )
     location: Optional[str] = Field(default=None, description="Job location")
     results_wanted: Optional[int] = Field(
-        default=20, ge=1, le=100, description="Number of results per site"
+        default=20, ge=1, le=1000, description="Number of results per site (max 1000)"
     )
     hours_old: Optional[int] = Field(
         default=None, description="Filter jobs by hours since posted"
@@ -52,7 +56,8 @@ class JobSearchRequest(BaseModel):
     )
     distance: Optional[int] = Field(default=50, description="Search distance in miles")
     country_indeed: Optional[str] = Field(
-        default="USA", description="Country for Indeed/Glassdoor"
+        default="USA",
+        description="Country for Indeed/Glassdoor (see supported countries)",
     )
     easy_apply: Optional[bool] = Field(
         default=None, description="Filter for easy apply jobs"
@@ -61,7 +66,24 @@ class JobSearchRequest(BaseModel):
         default="markdown", description="markdown or html"
     )
     linkedin_fetch_description: Optional[bool] = Field(
-        default=False, description="Fetch full LinkedIn descriptions"
+        default=False, description="Fetch full LinkedIn descriptions (slower)"
+    )
+    linkedin_company_ids: Optional[List[int]] = Field(
+        default=None, description="Search specific LinkedIn company IDs"
+    )
+    offset: Optional[int] = Field(
+        default=None,
+        description="Start search from offset (e.g. 25 starts from 25th result)",
+    )
+    enforce_annual_salary: Optional[bool] = Field(
+        default=None, description="Convert wages to annual salary"
+    )
+    proxies: Optional[List[str]] = Field(
+        default=None,
+        description="List of proxies in format ['user:pass@host:port', 'localhost']",
+    )
+    ca_cert: Optional[str] = Field(
+        default=None, description="Path to CA Certificate file for proxies"
     )
     verbose: Optional[int] = Field(default=1, ge=0, le=2, description="Verbosity level")
 
@@ -148,7 +170,7 @@ async def search_jobs(request: JobSearchRequest):
 
 @app.get("/sites")
 async def get_supported_sites():
-    """Get list of supported job sites"""
+    """Get comprehensive information about supported job sites and parameters"""
     return {
         "supported_sites": [
             "linkedin",
@@ -161,6 +183,88 @@ async def get_supported_sites():
         ],
         "job_types": ["fulltime", "parttime", "internship", "contract"],
         "description_formats": ["markdown", "html"],
+        "supported_countries": {
+            "indeed_glassdoor": [
+                "Argentina",
+                "Australia",
+                "Austria",
+                "Bahrain",
+                "Belgium",
+                "Brazil",
+                "Canada",
+                "Chile",
+                "China",
+                "Colombia",
+                "Costa Rica",
+                "Czech Republic",
+                "Denmark",
+                "Ecuador",
+                "Egypt",
+                "Finland",
+                "France",
+                "Germany",
+                "Greece",
+                "Hong Kong",
+                "Hungary",
+                "India",
+                "Indonesia",
+                "Ireland",
+                "Israel",
+                "Italy",
+                "Japan",
+                "Kuwait",
+                "Luxembourg",
+                "Malaysia",
+                "Mexico",
+                "Morocco",
+                "Netherlands",
+                "New Zealand",
+                "Nigeria",
+                "Norway",
+                "Oman",
+                "Pakistan",
+                "Panama",
+                "Peru",
+                "Philippines",
+                "Poland",
+                "Portugal",
+                "Qatar",
+                "Romania",
+                "Saudi Arabia",
+                "Singapore",
+                "South Africa",
+                "South Korea",
+                "Spain",
+                "Sweden",
+                "Switzerland",
+                "Taiwan",
+                "Thailand",
+                "Turkey",
+                "Ukraine",
+                "United Arab Emirates",
+                "UK",
+                "USA",
+                "Uruguay",
+                "Venezuela",
+                "Vietnam",
+            ],
+            "linkedin": "Global (uses location parameter)",
+            "zip_recruiter": "US/Canada only",
+            "bayt": "International",
+            "google": "Global (requires google_search_term)",
+            "naukri": "India focused",
+        },
+        "limitations": {
+            "indeed": "Only one of: hours_old, (job_type & is_remote), easy_apply",
+            "linkedin": "Only one of: hours_old, easy_apply. Rate limited ~10 pages per IP",
+            "google": "Requires specific google_search_term syntax",
+            "general": "All sites capped at ~1000 jobs per search",
+        },
+        "tips": {
+            "indeed_search": "Use quotes for exact match, - to exclude, OR for alternatives. Example: '\"engineering intern\" software summer (java OR python OR c++) 2025 -tax -marketing'",
+            "google_search": "Copy exact search from Google Jobs browser after applying filters",
+            "rate_limiting": "Use proxies for LinkedIn, wait between scrapes, Indeed has no rate limiting",
+        },
     }
 
 
